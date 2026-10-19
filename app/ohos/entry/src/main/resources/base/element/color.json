@@ -1,0 +1,14 @@
+{
+  "color": [
+    { "name": "start_window_background", "value": "#FFFFFF" },
+    { "name": "app_primary", "value": "#4F46E5" },
+    { "name": "app_bg", "value": "#F1F2F6" },
+    { "name": "card_bg", "value": "#FFFFFF" },
+    { "name": "text_primary", "value": "#1F2329" },
+    { "name": "text_secondary", "value": "#86909C" },
+    { "name": "divider", "value": "#E5E6EB" },
+    { "name": "success", "value": "#00B42A" },
+    { "name": "danger", "value": "#F53F3F" },
+    { "name": "warning", "value": "#FF7D00" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "LanShare main module" },
+    { "name": "ability_desc", "value": "LAN file sharing" },
+    { "name": "ability_label", "value": "LanShare" }
+  ]
+}

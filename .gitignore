@@ -1,0 +1,32 @@
+# Node / hvigor
+node_modules/
+oh_modules/
+/.hvigor/
+.cxx/
+.cache/
+
+# DevEco Studio / IDE
+/.idea/
+*.iml
+local.properties
+/.clangd
+/.clang-format
+/.clang-tidy
+/.appanalyzer
+
+# Build outputs
+**/build/
+*.har
+*.hsp
+/output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Signing
+*.p12
+*.cer
+*.p7b
+signing/
+.zcode/

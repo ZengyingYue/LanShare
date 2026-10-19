@@ -1,0 +1,54 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "LanShare main module" },
+    { "name": "ability_desc", "value": "LAN file sharing" },
+    { "name": "ability_label", "value": "LanShare" },
+
+    { "name": "tab_nearby", "value": "Nearby" },
+    { "name": "tab_send", "value": "Send" },
+    { "name": "tab_receive", "value": "Receive" },
+    { "name": "tab_settings", "value": "Settings" },
+
+    { "name": "nearby_title", "value": "Nearby devices" },
+    { "name": "nearby_empty", "value": "No devices found. Make sure other devices are running LocalSend or LanShare on the same network, then tap refresh." },
+    { "name": "refresh", "value": "Refresh" },
+    { "name": "send_to_this_device", "value": "Send" },
+
+    { "name": "send_title", "value": "Send files" },
+    { "name": "pick_files", "value": "Pick files" },
+    { "name": "pick_photos", "value": "Pick photos" },
+    { "name": "send_files_empty", "value": "No files selected yet. Pick files, then tap a device in the Nearby tab." },
+    { "name": "sending", "value": "Sending..." },
+    { "name": "send_done", "value": "Sent successfully" },
+    { "name": "send_failed", "value": "Send failed" },
+    { "name": "file_too_large", "value": "File too large (max 64 MB in this preview build)" },
+    { "name": "pin_required", "value": "Target device requires a PIN. Set it in the box above and retry." },
+    { "name": "pin_label", "value": "Target PIN (if any)" },
+    { "name": "clear", "value": "Clear" },
+
+    { "name": "receive_title", "value": "Receive" },
+    { "name": "server_running", "value": "Receiving service running on port %d" },
+    { "name": "server_not_running", "value": "Receiving service not running" },
+    { "name": "incoming_request", "value": "Incoming request" },
+    { "name": "incoming_from", "value": "From: %s" },
+    { "name": "accept_all", "value": "Accept" },
+    { "name": "decline", "value": "Decline" },
+    { "name": "receiving_files", "value": "Receiving files..." },
+    { "name": "saving_files", "value": "Saving files..." },
+    { "name": "save_files", "value": "Save to device" },
+    { "name": "receive_done", "value": "Files received. Choose where to save them." },
+    { "name": "receive_saved", "value": "Saved" },
+    { "name": "receive_failed", "value": "Receive failed" },
+    { "name": "waiting_sender", "value": "Waiting for the sender to upload..." },
+
+    { "name": "settings_title", "value": "Settings" },
+    { "name": "settings_alias", "value": "Device name" },
+    { "name": "settings_port", "value": "Port" },
+    { "name": "settings_pin", "value": "PIN (empty = off)" },
+    { "name": "settings_security_note", "value": "This preview build transfers over plain HTTP. Encrypted HTTPS (TLS) arrives in M2." },
+    { "name": "save", "value": "Save" },
+    { "name": "saved", "value": "Saved" },
+    { "name": "fingerprint_label", "value": "Fingerprint" },
+    { "name": "protocol_label", "value": "Protocol" }
+  ]
+}

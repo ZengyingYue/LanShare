@@ -1,0 +1,54 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "LanShare 主模块" },
+    { "name": "ability_desc", "value": "局域网文件共享" },
+    { "name": "ability_label", "value": "LanShare" },
+
+    { "name": "tab_nearby", "value": "附近" },
+    { "name": "tab_send", "value": "发送" },
+    { "name": "tab_receive", "value": "接收" },
+    { "name": "tab_settings", "value": "设置" },
+
+    { "name": "nearby_title", "value": "附近的设备" },
+    { "name": "nearby_empty", "value": "暂未发现设备。请确认其他设备在同一局域网内运行 LocalSend 或 LanShare，然后点击刷新。" },
+    { "name": "refresh", "value": "刷新" },
+    { "name": "send_to_this_device", "value": "发送" },
+
+    { "name": "send_title", "value": "发送文件" },
+    { "name": "pick_files", "value": "选择文件" },
+    { "name": "pick_photos", "value": "选择照片" },
+    { "name": "send_files_empty", "value": "尚未选择文件。请先选择文件，再到“附近”页点击目标设备。" },
+    { "name": "sending", "value": "发送中..." },
+    { "name": "send_done", "value": "发送成功" },
+    { "name": "send_failed", "value": "发送失败" },
+    { "name": "file_too_large", "value": "文件过大（预览版单文件上限 64 MB）" },
+    { "name": "pin_required", "value": "目标设备要求 PIN 码，请填写后再试。" },
+    { "name": "pin_label", "value": "目标设备 PIN 码（如有）" },
+    { "name": "clear", "value": "清空" },
+
+    { "name": "receive_title", "value": "接收" },
+    { "name": "server_running", "value": "接收服务已启动，端口 %d" },
+    { "name": "server_not_running", "value": "接收服务未运行" },
+    { "name": "incoming_request", "value": "收到传输请求" },
+    { "name": "incoming_from", "value": "来自：%s" },
+    { "name": "accept_all", "value": "接收" },
+    { "name": "decline", "value": "拒绝" },
+    { "name": "receiving_files", "value": "正在接收文件..." },
+    { "name": "saving_files", "value": "正在保存..." },
+    { "name": "save_files", "value": "保存到本机" },
+    { "name": "receive_done", "value": "文件已接收，请选择保存位置。" },
+    { "name": "receive_saved", "value": "已保存" },
+    { "name": "receive_failed", "value": "接收失败" },
+    { "name": "waiting_sender", "value": "等待对方上传..." },
+
+    { "name": "settings_title", "value": "设置" },
+    { "name": "settings_alias", "value": "设备名称" },
+    { "name": "settings_port", "value": "端口" },
+    { "name": "settings_pin", "value": "PIN 码（留空关闭）" },
+    { "name": "settings_security_note", "value": "预览版当前使用 HTTP 明文传输，加密传输（HTTPS/TLS）将在 M2 提供。" },
+    { "name": "save", "value": "保存" },
+    { "name": "saved", "value": "已保存" },
+    { "name": "fingerprint_label", "value": "指纹" },
+    { "name": "protocol_label", "value": "协议" }
+  ]
+}
