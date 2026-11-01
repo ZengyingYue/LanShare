@@ -68,8 +68,9 @@ ArkTS 应用逻辑跑在同一事件循环上，服务端回调可直接触发 U
 
 `LocalSendClient` 基于 RemoteCommunicationKit（rcp），单个长生命周期
 Session，`remoteValidation: 'skip'` + `proxy: 'no-proxy'`：同一代码路径
-即可连接 HTTP 与 HTTPS（官方客户端默认）对端，且局域网流量不经系统代理/VPN。
-HTTP 兜底扫描对每个地址同时尝试 https 与 http。
+连接 HTTP 对端，且局域网流量不经系统代理/VPN。HTTPS 对端（官方客户端默认）
+实测要求客户端证书（mTLS），M1 未实现，需在 M2 给 rcp Session 配置客户端证书。
+HTTP 兜底扫描对每个地址同时尝试 https 与 http（https 探测在 M2 前会被拒）。
 
 请求体与接收缓冲均为整块 ArrayBuffer，因此 M1 限制单文件 64 MB
 （`ProtocolConstants.MAX_FILE_SIZE_BYTES`）：发送侧在选择阶段标记，

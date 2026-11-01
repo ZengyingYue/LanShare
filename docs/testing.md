@@ -71,6 +71,10 @@ python3 tools/lspeer.py discover                     # 多播宣告，列出应�
 python3 tools/lspeer.py serve --out ~/inbox          # 当接收端；可加 --pin 1234 / --mode decline|busy
 python3 tools/lspeer.py send <手机IP> a.jpg b.pdf     # 当发送端
 python3 tools/lspeer.py scenarios <手机IP> [--pin 1234]   # 按提示在手机上点接受/拒绝，自动判定结果
+
+# 发给开启加密的官方客户端：需要客户端证书（send 默认先试 https，失败再退回 http）
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 3650 -subj "/CN=LocalSend User"
+python3 tools/lspeer.py --cert cert.pem --key key.pem send <电脑IP> a.jpg
 ```
 
 ## 3. M1 测试清单
@@ -83,7 +87,7 @@ python3 tools/lspeer.py scenarios <手机IP> [--pin 1234]   # 按提示在手机
 | 2 | 多播发现：电脑 → 手机 | `lspeer discover` / 官方客户端刷新 | 列出 LanShare 手机 |
 | 3 | HTTP 兜底 | 关闭电脑端多播（或换 AP 隔离多播的网络），点「刷新」 | 仍能发现（https 与 http 均扫描） |
 | 4 | 电脑 → 手机 | 官方客户端发送 2 个文件 | 手机弹确认，接受后保存成功，内容一致 |
-| 5 | 手机 → 电脑（官方默认加密开） | LanShare 发送到官方客户端 | 成功（走 HTTPS，跳过证书校验） |
+| 5 | 手机 → 电脑（官方默认加密开） | LanShare 发送到官方客户端 | **M1 预期失败**：官方要求客户端证书（mTLS），M2 后应成功 |
 | 6 | 手机 → 电脑（官方关闭加密） | 同上 | 成功（HTTP） |
 | 7 | 拒绝 | 手机点拒绝 | 发送方提示被拒（403） |
 | 8 | PIN | 手机设 PIN，`scenarios --pin` | 401、401、429；正确 PIN 后可传 |
@@ -93,3 +97,21 @@ python3 tools/lspeer.py scenarios <手机IP> [--pin 1234]   # 按提示在手机
 | 12 | 设置 | 改设备名保存 | 立即生效，PIN 不被清空；改端口提示重启 |
 
 结果记录到 issue 或本文件末尾，修复后发布 0.1.x。
+
+## 4. 实测记录
+
+### 2026-11-01 — PC ↔ PC（Linux `lspeer` ↔ Windows 官方 LocalSend 2.2，同一 Wi-Fi）
+
+| 方向 | 结果 | 备注 |
+|------|------|------|
+| 多播发现（双向） | ✅ | Windows 收到宣告后通过 HTTP `/register` 回连 |
+| Windows → Linux | ✅ 内容一致 | 官方客户端用 **chunked** 传输上传（无 Content-Length）；lspeer 原先只认 Content-Length，收到 0 字节，已修复 |
+| Linux → Windows（20 MB + 中文文件名） | ✅ SHA-256 一致 | 走 HTTPS，**必须出示客户端证书**；~4 MB/s |
+
+发现：
+
+1. **官方 HTTPS 服务要求客户端证书（mTLS）**。不带证书 → `certificate required`；新证书首次连接会
+   `access denied`，片刻后同一证书被接受（原因未明，待查）。直接影响 LanShare：M1 发送端发不了默认配置的官方客户端（清单 #5）。
+2. **官方上传使用 chunked 编码**。LanShare `HttpServer` 已实现 chunked 解析，真机测试 #4 时重点确认。
+3. Windows 上关闭「加密」后，服务未立即切回 HTTP（仍是 TLS），可能需要重启 LocalSend。
+

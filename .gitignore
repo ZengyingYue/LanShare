@@ -30,3 +30,7 @@ Thumbs.db
 *.p7b
 signing/
 .zcode/
+
+# Python
+__pycache__/
+*.pyc

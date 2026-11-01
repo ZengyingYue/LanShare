@@ -25,8 +25,9 @@
 - [ ] DevEco Studio 构建验证（需 Windows/macOS）
 - [ ] 真机 ↔ 桌面版 LocalSend 互传测试
 - [x] M1 代码修正：补齐 oh-package、GET_NETWORK_INFO 权限、ArkTS 严格模式问题；
-      发送侧改用 rcp，可直连开启加密（HTTPS）的官方客户端
-- [ ] M1 限制：接收侧明文 HTTP；发送 HTTPS 暂不校验证书；单文件 ≤ 64 MB
+      发送侧改用 rcp（但开启加密的官方客户端要求客户端证书，见下条）
+- [ ] M1 限制：接收侧明文 HTTP；**发送到开启加密的官方客户端会失败**（需客户端证书，M2）；单文件 ≤ 64 MB
+- [x] PC ↔ PC 实测：`lspeer` ↔ Windows 官方 LocalSend 2.2 双向互传，哈希一致（见 docs/testing.md）
 
 见 [docs/roadmap.md](docs/roadmap.md) 了解完整里程碑（M2 将加入 TLS 加密与证书指纹）。
 

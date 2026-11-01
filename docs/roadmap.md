@@ -12,7 +12,7 @@
 
 - [x] 静态审查修正（未编译）：补 `oh-package.json5`、`GET_NETWORK_INFO` 权限、
       ArkTS 严格模式写法、保存到文档 URI、设置页 PIN 被清空、超大请求体 OOM 等
-- [x] 发送侧改用 rcp：可直连默认开启加密（HTTPS）的官方客户端
+- [x] 发送侧改用 rcp（实测：开启加密的官方 2.2 客户端要求客户端证书，M1 无法直连，移至 M2）
 - [x] PC 端测试对端 `tools/lspeer.py`（发现/收/发/场景脚本）
 - [ ] 构建通过（DevEco Studio 或 Linux Command Line Tools），修复编译问题
 - [ ] 真机 ↔ 桌面版 LocalSend 双向互传验证
@@ -25,8 +25,9 @@
 - [ ] 运行时生成 RSA-2048 自签名证书（cryptoFramework 生成密钥 +
       手写 X.509 DER 编码，`CN=LocalSend User`，与官方一致）
 - [ ] `TLSSocketServer` 替换 `TCPSocketServer`（PEM 注入）
-- [ ] 发送侧切换 rcp（`remoteValidation` 自定义校验），
-      实现指纹 TOFU + 已知指纹固定
+- [ ] **发送侧出示客户端证书（mTLS）**：官方 2.2 客户端的 HTTPS 服务要求客户端证书（mTLS），不带证书会被拒（`certificate required`）；
+      注册时上报的 fingerprint 取该证书 SHA-256（优先级最高，否则无法发给默认配置的官方客户端）
+- [ ] 发送侧 `remoteValidation` 自定义校验，实现指纹 TOFU + 已知指纹固定
 - [ ] 指纹迁移：随机 UUID → 证书 SHA-256（大写 hex）
 - [ ] 上传文件 sha256 校验（mismatch → 422）
 

@@ -34,6 +34,7 @@ GROUP = '224.0.0.167'
 PORT = 53317
 API = '/api/localsend/v2'
 FINGERPRINT = uuid.uuid4().hex.upper()
+CLIENT_CERT = None  # (cert.pem, key.pem): official clients >= 2.2 demand a client cert over HTTPS
 
 
 def log(msg):
@@ -125,6 +126,8 @@ def request(ip, port, method, path, body=None, scheme='http', timeout=10, raw=No
     if scheme == 'https':
         import ssl
         ctx = ssl._create_unverified_context()
+        if CLIENT_CERT:
+            ctx.load_cert_chain(*CLIENT_CERT)
         conn = http.client.HTTPSConnection(ip, port, timeout=timeout, context=ctx)
     else:
         conn = http.client.HTTPConnection(ip, port, timeout=timeout)
@@ -160,17 +163,17 @@ def file_entry(path):
     }
 
 
-def prepare(ip, port, alias, files, pin=None, timeout=120):
+def prepare(ip, port, alias, files, pin=None, timeout=120, scheme='http'):
     path = f'{API}/prepare-upload'
     if pin:
         path += '?pin=' + urllib.parse.quote(pin)
     body = {'info': identity(alias, PORT), 'files': {f['id']: f for f in files}}
-    return request(ip, port, 'POST', path, body, timeout=timeout)
+    return request(ip, port, 'POST', path, body, timeout=timeout, scheme=scheme)
 
 
-def upload(ip, port, session_id, file_id, token, data):
+def upload(ip, port, session_id, file_id, token, data, scheme='http'):
     q = urllib.parse.urlencode({'sessionId': session_id, 'fileId': file_id, 'token': token})
-    return request(ip, port, 'POST', f'{API}/upload?{q}', raw=data, timeout=300)
+    return request(ip, port, 'POST', f'{API}/upload?{q}', raw=data, timeout=300, scheme=scheme)
 
 
 # ---------------------------------------------------------------- receiver
@@ -199,6 +202,22 @@ def make_handler(rx, alias, port):
             self.wfile.write(body)
 
         def body(self):
+            # The official clients stream uploads with chunked transfer encoding
+            # (no Content-Length), so both framings must be handled.
+            if 'chunked' in (self.headers.get('Transfer-Encoding') or '').lower():
+                parts = []
+                while True:
+                    size_line = self.rfile.readline()
+                    if not size_line:
+                        break
+                    size = int(size_line.split(b';', 1)[0].strip() or b'0', 16)
+                    if size == 0:
+                        while self.rfile.readline() not in (b'\r\n', b'\n', b''):
+                            pass  # discard trailers
+                        break
+                    parts.append(self.rfile.read(size))
+                    self.rfile.readline()  # CRLF after each chunk
+                return b''.join(parts)
             length = int(self.headers.get('Content-Length') or 0)
             return self.rfile.read(length) if length else b''
 
@@ -272,13 +291,17 @@ def make_handler(rx, alias, port):
             if want:
                 ok = ok and hashlib.sha256(raw).hexdigest().lower() == want.lower()
             log(f'received {meta["fileName"]} -> {target} ({len(raw)} B) {"OK" if ok else "MISMATCH"}')
+            if not ok:
+                log(f'  expected {meta["size"]} B; Content-Length={self.headers.get("Content-Length")} '
+                    f'Transfer-Encoding={self.headers.get("Transfer-Encoding")}')
             with rx.lock:
                 if rx.session is s:
                     s['done'].add(q.get('fileId'))
                     if len(s['done']) == len(s['files']):
                         log(f'session {s["id"]} complete')
                         rx.session = None
-            self.reply(200)
+            # Don't let the sender believe a truncated file arrived intact.
+            self.reply(200 if ok else 500)
 
     return Handler
 
@@ -333,23 +356,33 @@ def cmd_serve(args):
 
 
 def cmd_send(args):
-    status, info = request(args.ip, args.port, 'POST', f'{API}/register', identity(args.alias, PORT), timeout=5)
-    log(f'register -> {status} {info}')
+    # Official clients default to HTTPS (self-signed); 'auto' tries it first, then HTTP.
+    schemes = ['https', 'http'] if args.scheme == 'auto' else [args.scheme]
+    for scheme in schemes:
+        try:
+            status, info = request(args.ip, args.port, 'POST', f'{API}/register',
+                                   identity(args.alias, PORT), scheme=scheme, timeout=5)
+            break
+        except (OSError, http.client.HTTPException) as e:
+            log(f'register over {scheme} failed: {e}')
+    else:
+        return 1
+    log(f'register ({scheme}) -> {status} {info}')
     files = [file_entry(p) for p in args.files]
     by_id = {f['id']: p for f, p in zip(files, args.files)}
     log('prepare-upload (accept on the phone)…')
-    status, resp = prepare(args.ip, args.port, args.alias, files, args.pin)
+    status, resp = prepare(args.ip, args.port, args.alias, files, args.pin, scheme=scheme)
     log(f'prepare-upload -> {status} {resp}')
     if status != 200:
         return 1
     sid = resp['sessionId']
     for fid, token in resp['files'].items():
         if args.cancel_after is not None and args.cancel_after == 0:
-            log(f'cancel -> {request(args.ip, args.port, "POST", f"{API}/cancel?sessionId={sid}")[0]}')
+            log(f'cancel -> {request(args.ip, args.port, "POST", f"{API}/cancel?sessionId={sid}", scheme=scheme)[0]}')
             return 0
         with open(by_id[fid], 'rb') as f:
             data = f.read()
-        status, _ = upload(args.ip, args.port, sid, fid, token, data)
+        status, _ = upload(args.ip, args.port, sid, fid, token, data, scheme=scheme)
         log(f'upload {os.path.basename(by_id[fid])} ({len(data)} B) -> {status}')
         if args.cancel_after is not None:
             args.cancel_after -= 1
@@ -448,6 +481,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--alias', default=f'lspeer-{socket.gethostname()}')
     p.add_argument('--bind', help='LAN IPv4 used for multicast (default: auto)')
+    p.add_argument('--cert', help='client certificate PEM for HTTPS peers (fingerprint = its SHA-256)')
+    p.add_argument('--key', help='private key PEM matching --cert')
     sub = p.add_subparsers(dest='cmd', required=True)
 
     d = sub.add_parser('discover')
@@ -465,6 +500,8 @@ def main():
     t.add_argument('--port', type=int, default=PORT)
     t.add_argument('--pin')
     t.add_argument('--cancel-after', type=int, help='cancel after uploading N files')
+    t.add_argument('--scheme', choices=['auto', 'http', 'https'], default='auto',
+                   help='auto: try https (official default, cert not verified) then http')
 
     c = sub.add_parser('scenarios')
     c.add_argument('ip')
@@ -472,6 +509,12 @@ def main():
     c.add_argument('--pin', help='PIN configured on the phone (enables the PIN checks)')
 
     args = p.parse_args()
+    if args.cert:
+        import ssl
+        global CLIENT_CERT, FINGERPRINT
+        CLIENT_CERT = (args.cert, args.key or args.cert)
+        with open(args.cert) as f:
+            FINGERPRINT = hashlib.sha256(ssl.PEM_cert_to_DER_cert(f.read())).hexdigest().upper()
     handler = {'discover': cmd_discover, 'serve': cmd_serve, 'send': cmd_send, 'scenarios': cmd_scenarios}
     sys.exit(handler[args.cmd](args) or 0)
 
