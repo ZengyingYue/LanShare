@@ -45,7 +45,7 @@ export class LanShareApp {
     // Initial UI state so the page can render before the network is up.
     AppStorage.setOrCreate(AppStorageKeys.DEVICES, new Array<Device>());
     AppStorage.setOrCreate(AppStorageKeys.RECEIVE_STATE, ReceiveSnapshot.idle());
-    AppStorage.setOrCreate(AppStorageKeys.SERVER_PORT, settings.port);
+    AppStorage.setOrCreate(AppStorageKeys.SERVER_PORT, 0);
     AppStorage.setOrCreate(AppStorageKeys.FINGERPRINT, settings.fingerprint);
     AppStorage.setOrCreate(AppStorageKeys.PROTOCOL, 'http');
     AppStorage.setOrCreate(AppStorageKeys.ALIAS, settings.alias);
@@ -66,6 +66,7 @@ export class LanShareApp {
     try {
       await server.start(settings.port);
       this.server = server;
+      AppStorage.setOrCreate(AppStorageKeys.SERVER_PORT, settings.port);
     } catch (e) {
       this.logger.error(`HTTP server failed to start on port ${settings.port} — receiving disabled`);
     }

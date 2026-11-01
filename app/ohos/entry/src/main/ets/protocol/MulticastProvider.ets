@@ -125,8 +125,10 @@ export class MulticastProvider {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise<void>((resolve: () => void) => {
-      setTimeout(resolve, ms);
+    return new Promise<void>((resolve: (value: void) => void) => {
+      setTimeout(() => {
+        resolve();
+      }, ms);
     });
   }
 }

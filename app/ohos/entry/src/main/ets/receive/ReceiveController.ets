@@ -36,7 +36,7 @@ class ReceiveSession {
   allDone(): boolean {
     let done = true;
     this.files.forEach((f: IncomingFile) => {
-      if (!f.done) {
+      if (!f.done && !f.skipped) {
         done = false;
       }
     });
@@ -80,8 +80,20 @@ export class ReceiveController {
     }
 
     const incomingFiles: IncomingFile[] = files.map((f: FileDto) => {
-      return new IncomingFile(f.id, f.fileName, f.size, f.fileType, '');
+      const incoming = new IncomingFile(f.id, f.fileName, f.size, f.fileType, '');
+      incoming.skipped = f.size > ProtocolConstants.MAX_FILE_SIZE_BYTES;
+      return incoming;
     });
+    let acceptable = 0;
+    incomingFiles.forEach((f: IncomingFile) => {
+      if (!f.skipped) {
+        acceptable++;
+      }
+    });
+    if (acceptable === 0) {
+      this.logger.info(`request from ${senderIp} has only oversized files, declining`);
+      return new PromptOutcome(false, '', new Map());
+    }
     let alias = senderIp;
     if (typeof sender.alias === 'string' && sender.alias.length > 0) {
       alias = sender.alias;
@@ -101,10 +113,13 @@ export class ReceiveController {
     const tokens = new Map<string, string>();
     const cacheDir = AppContext.getContext().cacheDir;
     incomingFiles.forEach((f: IncomingFile) => {
+      fileMap.set(f.id, f);
+      if (f.skipped) {
+        return; // no token: the sender will not upload it
+      }
       const token = util.generateRandomUUID(false);
       f.token = token;
       f.tempPath = `${cacheDir}/lanshare_${sessionId}_${ReceiveController.sanitize(f.fileName)}`;
-      fileMap.set(f.id, f);
       tokens.set(f.id, token);
     });
     this.session = new ReceiveSession(sessionId, senderIp, fileMap);
@@ -156,7 +171,7 @@ export class ReceiveController {
     if (file === undefined) {
       return 403; // unknown file
     }
-    if (file.token !== token) {
+    if (file.skipped || file.token !== token) {
       return 403; // token mismatch
     }
     if (file.done) {
@@ -215,20 +230,23 @@ export class ReceiveController {
     this.publish(ReceivePhases.SAVING, this.snapshot.senderAlias, this.snapshot.senderModel,
       this.snapshot.senderIp, session.sessionId, this.snapshotFiles(), '');
     try {
-      const names: string[] = [];
-      session.files.forEach((f: IncomingFile) => {
-        names.push(ReceiveController.sanitize(f.fileName));
-      });
+      const ordered = Array.from(session.files.values()).filter((f: IncomingFile) => f.done);
+      const names: string[] = ordered.map((f: IncomingFile) => ReceiveController.sanitize(f.fileName));
       const options = new picker.DocumentSaveOptions();
       options.newFileNames = names;
-      const docPicker = new picker.DocumentViewPicker();
+      const docPicker = new picker.DocumentViewPicker(AppContext.getContext());
       const uris = await docPicker.save(options);
       if (uris === undefined || uris === null || uris.length < names.length) {
         throw new Error('save cancelled');
       }
-      const ordered = Array.from(session.files.values());
       for (let i = 0; i < ordered.length; i++) {
-        fs.copyFileSync(ordered[i].tempPath, uris[i]);
+        // Picker results are document URIs, not paths: copy through an fd.
+        const target = fs.openSync(uris[i], fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+        try {
+          fs.copyFileSync(ordered[i].tempPath, target.fd);
+        } finally {
+          fs.closeSync(target);
+        }
         ReceiveController.deleteQuietly(ordered[i].tempPath);
       }
       this.logger.info(`saved ${ordered.length} file(s)`);

@@ -1,4 +1,4 @@
-import { http } from '@kit.NetworkKit';
+import { rcp } from '@kit.RemoteCommunicationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { Device, FileDto, Identity, IdentityJson, PrepareUploadResponseJson } from '../protocol/Dto';
 import { ProtocolConstants } from '../common/Constants';
@@ -15,38 +15,63 @@ export class PrepareUploadError extends Error {
 }
 
 /**
- * HTTP client for the LocalSend v2 REST API, built on @ohos.net.http.
+ * HTTP(S) client for the LocalSend v2 REST API, built on
+ * RemoteCommunicationKit (rcp).
  *
- * M1 speaks plain HTTP, which the protocol allows. When TLS lands in M2
- * this class will be re-based on RemoteCommunicationKit (rcp), whose
- * security configuration can accept self-signed peer certificates —
- * @ohos.net.http cannot skip certificate validation.
+ * The official desktop/mobile clients enable encryption by default and serve
+ * HTTPS with a per-install self-signed certificate. rcp lets us skip CA
+ * validation (@ohos.net.http cannot), so M1 can talk to peers in either
+ * mode. M2 replaces 'skip' with fingerprint pinning (TOFU).
+ *
+ * LAN traffic must never go through a system/VPN proxy, hence 'no-proxy'.
  */
 export class LocalSendClient {
   private static readonly logger: Logger = new Logger('Client');
+
+  private session: rcp.Session | null = null;
+
+  private getSession(): rcp.Session {
+    if (this.session === null) {
+      this.session = rcp.createSession({
+        requestConfiguration: {
+          security: { remoteValidation: 'skip' },
+          proxy: 'no-proxy'
+        }
+      } as rcp.SessionConfiguration);
+    }
+    return this.session;
+  }
+
+  private async post(url: string, contentType: string | null, body: string | ArrayBuffer | null,
+    connectMs: number, transferMs: number): Promise<rcp.Response> {
+    const headers: rcp.RequestHeaders = {};
+    if (contentType !== null) {
+      headers['content-type'] = contentType;
+    }
+    const request = new rcp.Request(url, 'POST', headers, body === null ? undefined : body);
+    request.configuration = {
+      transfer: { timeout: { connectMs: connectMs, transferMs: transferMs } }
+    } as rcp.Configuration;
+    return this.getSession().fetch(request);
+  }
 
   /**
    * POST /register to an explicit address. Used both for announce replies
    * and for the subnet-scan fallback discovery.
    * Returns null when the peer is unreachable or reports 412 (self).
    */
-  async registerTo(ip: string, port: number, identity: Identity, timeoutMs: number): Promise<Device | null> {
-    const client = http.createHttp();
+  async registerTo(ip: string, port: number, protocol: string, identity: Identity,
+    timeoutMs: number): Promise<Device | null> {
     try {
-      const url = `http://${ip}:${port}${ProtocolConstants.API_V2_BASE}/register`;
-      const response = await client.request(url, {
-        method: http.RequestMethod.POST,
-        header: { 'Content-Type': 'application/json' } as Record<string, string>,
-        extraData: JSON.stringify(identity.toRegisterRequestJson()),
-        connectTimeout: timeoutMs,
-        readTimeout: timeoutMs,
-        usingCache: false,
-        expectDataType: http.HttpDataType.STRING,
-        usingProtocol: http.HttpProtocol.HTTP1_1
-      } as http.HttpRequestOptions);
-      if (response.responseCode === 200 && typeof response.result === 'string') {
-        const json = JSON.parse(response.result) as IdentityJson;
+      const url = `${protocol}://${ip}:${port}${ProtocolConstants.API_V2_BASE}/register`;
+      const response = await this.post(url, 'application/json',
+        JSON.stringify(identity.toRegisterRequestJson()), timeoutMs, timeoutMs);
+      if (response.statusCode === 200) {
+        const json = JSON.parse(response.toString() ?? '') as IdentityJson;
         if (typeof json.fingerprint === 'string' && json.fingerprint.length > 0) {
+          // The /register response omits port/protocol; we know both.
+          json.port = port;
+          json.protocol = protocol;
           return Device.fromIdentityJson(json, ip);
         }
       }
@@ -54,14 +79,12 @@ export class LocalSendClient {
       return null;
     } catch (e) {
       return null;
-    } finally {
-      client.destroy();
     }
   }
 
   /** Reply to a peer's announcement: introduces us and refreshes its info. */
   async register(device: Device, identity: Identity): Promise<Device | null> {
-    return this.registerTo(device.ip, device.port, identity, 2500);
+    return this.registerTo(device.ip, device.port, device.protocol, identity, 2500);
   }
 
   /**
@@ -86,35 +109,28 @@ export class LocalSendClient {
       url = `${url}?pin=${encodeURIComponent(pin)}`;
     }
 
-    const client = http.createHttp();
+    let response: rcp.Response;
     try {
-      const response = await client.request(url, {
-        method: http.RequestMethod.POST,
-        header: { 'Content-Type': 'application/json' } as Record<string, string>,
-        extraData: JSON.stringify(body),
-        connectTimeout: 5000,
-        readTimeout: 30000,
-        usingCache: false,
-        expectDataType: http.HttpDataType.STRING,
-        usingProtocol: http.HttpProtocol.HTTP1_1
-      } as http.HttpRequestOptions);
-      const status = response.responseCode;
-      if (status === 200 && typeof response.result === 'string') {
-        return JSON.parse(response.result) as PrepareUploadResponseJson;
-      }
-      const message = `prepare-upload rejected with ${status}`;
-      LocalSendClient.logger.warn(message);
-      throw new PrepareUploadError(status, message);
+      // The receiver holds this request open until its user decides
+      // (LocalSend waits up to a few minutes), so the transfer timeout is long.
+      response = await this.post(url, 'application/json', JSON.stringify(body), 5000, 180000);
     } catch (e) {
-      if (e instanceof PrepareUploadError) {
-        throw e;
-      }
       const err = e as BusinessError;
       LocalSendClient.logger.error(`prepare-upload failed: ${err.message ?? 'unknown'}`);
       throw new PrepareUploadError(0, 'network error');
-    } finally {
-      client.destroy();
     }
+    const status = response.statusCode;
+    if (status === 200) {
+      return JSON.parse(response.toString() ?? '') as PrepareUploadResponseJson;
+    }
+    if (status === 204) {
+      // Receiver already has everything; nothing to upload.
+      const empty: PrepareUploadResponseJson = { sessionId: '', files: {} };
+      return empty;
+    }
+    const message = `prepare-upload rejected with ${status}`;
+    LocalSendClient.logger.warn(message);
+    throw new PrepareUploadError(status, message);
   }
 
   /** Upload one file: POST /upload with the raw bytes as the request body. */
@@ -124,26 +140,17 @@ export class LocalSendClient {
       + `?sessionId=${encodeURIComponent(sessionId)}`
       + `&fileId=${encodeURIComponent(fileId)}`
       + `&token=${encodeURIComponent(token)}`;
-
-    const client = http.createHttp();
     try {
-      const response = await client.request(url, {
-        method: http.RequestMethod.POST,
-        header: { 'Content-Type': 'application/octet-stream' } as Record<string, string>,
-        extraData: data,
-        connectTimeout: 5000,
-        // Whole-body upload of up to 64 MB over Wi-Fi needs headroom.
-        readTimeout: 300000,
-        usingCache: false,
-        usingProtocol: http.HttpProtocol.HTTP1_1
-      } as http.HttpRequestOptions);
-      return response.responseCode === 200;
+      // Whole-body upload of up to 64 MB over Wi-Fi needs headroom.
+      const response = await this.post(url, 'application/octet-stream', data, 5000, 300000);
+      if (response.statusCode !== 200) {
+        LocalSendClient.logger.warn(`upload ${fileId} rejected with ${response.statusCode}`);
+      }
+      return response.statusCode === 200;
     } catch (e) {
       const err = e as BusinessError;
       LocalSendClient.logger.error(`upload ${fileId} failed: ${err.message ?? 'unknown'}`);
       return false;
-    } finally {
-      client.destroy();
     }
   }
 
@@ -151,19 +158,10 @@ export class LocalSendClient {
   async cancel(device: Device, sessionId: string): Promise<void> {
     const url = `${device.baseUrl()}${ProtocolConstants.API_V2_BASE}/cancel`
       + `?sessionId=${encodeURIComponent(sessionId)}`;
-    const client = http.createHttp();
     try {
-      await client.request(url, {
-        method: http.RequestMethod.POST,
-        connectTimeout: 3000,
-        readTimeout: 3000,
-        usingCache: false,
-        usingProtocol: http.HttpProtocol.HTTP1_1
-      } as http.HttpRequestOptions);
+      await this.post(url, null, null, 3000, 3000);
     } catch (e) {
       // ignore
-    } finally {
-      client.destroy();
     }
   }
 }

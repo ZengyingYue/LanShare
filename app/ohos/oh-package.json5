@@ -1,0 +1,6 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "LanShare — native HarmonyOS LAN file sharing (LocalSend v2 compatible)",
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -139,13 +139,14 @@ export class SendController {
     } catch (e) {
       let outcome = SendResult.FAILED;
       if (e instanceof PrepareUploadError) {
-        if (e.status === 401) {
+        const status = (e as PrepareUploadError).status;
+        if (status === 401) {
           outcome = SendResult.PIN_REQUIRED;
-        } else if (e.status === 403) {
+        } else if (status === 403) {
           outcome = SendResult.DECLINED;
-        } else if (e.status === 409) {
+        } else if (status === 409) {
           outcome = SendResult.BUSY;
-        } else if (e.status === 429) {
+        } else if (status === 429) {
           outcome = SendResult.PIN_LOCKED;
         }
       }

@@ -20,6 +20,8 @@ export class IncomingFile {
   token: string;
   bytesReceived: number = 0;
   done: boolean = false;
+  /** Not accepted because it exceeds the in-memory size cap of this build. */
+  skipped: boolean = false;
   tempPath: string = '';
 
   constructor(id: string, fileName: string, size: number, fileType: string, token: string) {

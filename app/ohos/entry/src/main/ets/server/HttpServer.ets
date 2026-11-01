@@ -1,6 +1,7 @@
 import { socket } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { ByteUtils } from '../common/ByteUtils';
+import { ProtocolConstants } from '../common/Constants';
 import { Logger } from '../common/Logger';
 
 /** A fully buffered request handed to the router. */
@@ -38,6 +39,10 @@ export class HttpResponse {
 }
 
 export type RequestHandler = (req: HttpRequest) => Promise<HttpResponse>;
+
+/** Body exceeds what we are willing to buffer in memory; answered with 413. */
+class PayloadTooLargeError extends Error {
+}
 
 /** Incremental decoder for `Transfer-Encoding: chunked` bodies. */
 class ChunkedDecoder {
@@ -156,7 +161,12 @@ class ConnectionState {
   }
 
   private pushBody(chunk: ArrayBuffer): HttpRequest | null {
+    // Bodies are fully buffered, so cap them before memory runs out.
+    if (this.bodyReceived + chunk.byteLength > HttpServer.MAX_BODY_BYTES) {
+      throw new PayloadTooLargeError('body too large');
+    }
     if (this.chunked) {
+      this.bodyReceived += chunk.byteLength;
       if (this.chunkDecoder === null) {
         this.chunkDecoder = new ChunkedDecoder();
       }
@@ -184,7 +194,7 @@ class ConnectionState {
       const merged = new Uint8Array(ByteUtils.concat(this.bodyParts));
       body = merged.slice(0, this.contentLength).buffer;
     }
-    return {
+    const request: HttpRequest = {
       method: this.method,
       path: this.path,
       query: this.query,
@@ -192,6 +202,7 @@ class ConnectionState {
       body: body,
       remoteAddress: this.remoteAddress
     };
+    return request;
   }
 
   private parseHead(headText: string): void {
@@ -229,6 +240,9 @@ class ConnectionState {
         const parsed = parseInt(contentLengthHeader, 10);
         if (isNaN(parsed) || parsed < 0) {
           throw new Error('invalid content-length');
+        }
+        if (parsed > HttpServer.MAX_BODY_BYTES) {
+          throw new PayloadTooLargeError('content-length too large');
         }
         this.contentLength = parsed;
       }
@@ -274,6 +288,8 @@ export class HttpServer {
   static readonly CRLF: Uint8Array = new Uint8Array([13, 10]);
   static readonly CRLFCRLF: Uint8Array = new Uint8Array([13, 10, 13, 10]);
   static readonly MAX_HEADER_BYTES: number = 65536;
+  /** Largest file we accept plus headroom for JSON bodies. */
+  static readonly MAX_BODY_BYTES: number = ProtocolConstants.MAX_FILE_SIZE_BYTES + 1024 * 1024;
 
   private static readonly REASONS: Record<string, string> = {
     '200': 'OK',
@@ -333,16 +349,28 @@ export class HttpServer {
 
   private onConnect(connection: socket.TCPSocketConnection): void {
     const state = new ConnectionState();
+    // One response per connection: ignore bytes that arrive after we answered.
+    let answered = false;
     connection.on('message', (info: socket.SocketMessageInfo) => {
+      if (answered) {
+        return;
+      }
       let request: HttpRequest | null = null;
       try {
         request = state.push(info.message, info.remoteInfo.address);
       } catch (e) {
-        this.logger.warn(`bad request from ${info.remoteInfo.address}`);
-        this.sendAndClose(connection, HttpResponse.text(400, 'Bad Request'));
+        answered = true;
+        if (e instanceof PayloadTooLargeError) {
+          this.logger.warn(`payload too large from ${info.remoteInfo.address}`);
+          this.sendAndClose(connection, HttpResponse.text(413, 'Payload Too Large'));
+        } else {
+          this.logger.warn(`bad request from ${info.remoteInfo.address}`);
+          this.sendAndClose(connection, HttpResponse.text(400, 'Bad Request'));
+        }
         return;
       }
       if (request !== null) {
+        answered = true;
         this.dispatch(connection, request);
       }
     });

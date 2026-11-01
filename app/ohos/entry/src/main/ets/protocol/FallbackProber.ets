@@ -6,14 +6,15 @@ import { Logger } from '../common/Logger';
 
 /**
  * Fallback discovery when multicast does not work on a network: enumerate
- * the /24 of every local interface and POST /register to each candidate.
+ * the /24 of every local interface and POST /register to each candidate
+ * over both HTTPS and HTTP.
  *
  * This mirrors the protocol's HTTP discovery mode; LocalSend devices
  * answer /register with their identity, non-LocalSend hosts time out.
  */
 export class FallbackProber {
   private static readonly logger: Logger = new Logger('Prober');
-  private static readonly CONCURRENCY: number = 50;
+  private static readonly CONCURRENCY: number = 32;
   private static readonly TIMEOUT_MS: number = 400;
 
   /**
@@ -31,8 +32,9 @@ export class FallbackProber {
     FallbackProber.logger.info(`probing ${candidates.length} addresses`);
     for (let i = 0; i < candidates.length; i += FallbackProber.CONCURRENCY) {
       const batch = candidates.slice(i, i + FallbackProber.CONCURRENCY);
+      // Official clients default to HTTPS (encryption on); try both schemes.
       const results = await Promise.all(batch.map((ip: string) => {
-        return client.registerTo(ip, identity.port, identity, FallbackProber.TIMEOUT_MS);
+        return FallbackProber.probeOne(client, ip, identity);
       }));
       for (let j = 0; j < results.length; j++) {
         const device = results[j];
@@ -44,6 +46,15 @@ export class FallbackProber {
     }
     FallbackProber.logger.info(`probe finished, ${found} device(s)`);
     return found;
+  }
+
+  private static async probeOne(client: LocalSendClient, ip: string,
+    identity: Identity): Promise<Device | null> {
+    const results = await Promise.all([
+      client.registerTo(ip, identity.port, 'https', identity, FallbackProber.TIMEOUT_MS),
+      client.registerTo(ip, identity.port, 'http', identity, FallbackProber.TIMEOUT_MS)
+    ]);
+    return results[0] !== null ? results[0] : results[1];
   }
 
   private static async collectCandidates(): Promise<string[]> {

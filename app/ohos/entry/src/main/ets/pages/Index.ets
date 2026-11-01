@@ -34,12 +34,13 @@ struct Index {
     });
     // Bootstrap may already have published these before the page loaded.
     const port = AppStorage.get<number>('lanshare_server_port');
-    if (port !== undefined && this.portDraft === '') {
+    if (port !== undefined && port > 0 && this.portDraft === '') {
       this.portDraft = `${port}`;
     }
     const alias = AppStorage.get<string>('lanshare_alias');
     if (alias !== undefined && this.aliasDraft === '') {
       this.aliasDraft = alias;
+      this.loadSettingDrafts();
     }
   }
 
@@ -52,6 +53,19 @@ struct Index {
   onAliasPublished(): void {
     if (this.aliasDraft === '' && this.storedAlias !== '') {
       this.aliasDraft = this.storedAlias;
+      this.loadSettingDrafts();
+    }
+  }
+
+  private loadSettingDrafts(): void {
+    try {
+      const settings = AppContext.getSettings();
+      this.pinDraft = settings.pin;
+      if (this.portDraft === '') {
+        this.portDraft = `${settings.port}`;
+      }
+    } catch (e) {
+      // settings not loaded yet; onAliasPublished retries
     }
   }
 
@@ -269,7 +283,7 @@ struct Index {
 
   private async pickDocuments(): Promise<void> {
     try {
-      const docPicker = new picker.DocumentViewPicker();
+      const docPicker = new picker.DocumentViewPicker(getContext(this));
       const uris = await docPicker.select();
       if (uris !== undefined && uris !== null) {
         this.sendController.addUris(uris);
@@ -310,9 +324,14 @@ struct Index {
     if (result.outcome === SendResult.OK) {
       message = $r('app.string.send_done');
       this.sendController.clear();
-    } else if (result.outcome === SendResult.PIN_REQUIRED
-      || result.outcome === SendResult.PIN_LOCKED) {
+    } else if (result.outcome === SendResult.PIN_REQUIRED) {
       message = $r('app.string.pin_required');
+    } else if (result.outcome === SendResult.PIN_LOCKED) {
+      message = $r('app.string.pin_locked');
+    } else if (result.outcome === SendResult.DECLINED) {
+      message = $r('app.string.send_declined');
+    } else if (result.outcome === SendResult.BUSY) {
+      message = $r('app.string.send_busy');
     } else if (result.outcome === SendResult.EMPTY) {
       message = $r('app.string.send_files_empty');
     } else {
@@ -409,9 +428,9 @@ struct Index {
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .layoutWeight(1)
-              Text(this.formatSize(file.size))
+              Text(file.skipped ? $r('app.string.file_skipped') : this.formatSize(file.size))
                 .fontSize(12)
-                .fontColor($r('app.color.text_secondary'))
+                .fontColor(file.skipped ? $r('app.color.danger') : $r('app.color.text_secondary'))
             }
             .width('100%')
             .padding({ top: 6, bottom: 6 })
@@ -492,9 +511,10 @@ struct Index {
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .layoutWeight(1)
-              Text(file.done ? '✓' : '…')
+              Text(file.skipped ? '✗' : (file.done ? '✓' : '…'))
                 .fontSize(14)
-                .fontColor(file.done ? $r('app.color.success') : $r('app.color.text_secondary'))
+                .fontColor(file.done ? $r('app.color.success')
+                  : (file.skipped ? $r('app.color.danger') : $r('app.color.text_secondary')))
             }
             .width('100%')
             .padding({ top: 6, bottom: 6 })
@@ -582,14 +602,14 @@ struct Index {
           .margin({ top: 16 })
 
         Row() {
-          Text(`${$r('app.string.protocol_label')}: ${this.protocol}`)
+          Text($r('app.string.protocol_value', this.protocol))
             .fontSize(12)
             .fontColor($r('app.color.text_secondary'))
             .layoutWeight(1)
         }
         .width('100%')
         .margin({ top: 8 })
-        Text(`${$r('app.string.fingerprint_label')}: ${this.fingerprint}`)
+        Text($r('app.string.fingerprint_value', this.fingerprint))
           .fontSize(10)
           .fontColor($r('app.color.text_secondary'))
           .maxLines(2)
@@ -620,13 +640,19 @@ struct Index {
     try {
       const settings = AppContext.getSettings();
       settings.alias = this.aliasDraft.trim().length > 0 ? this.aliasDraft.trim() : settings.alias;
+      const previousPort = settings.port;
       const port = parseInt(this.portDraft, 10);
       if (!isNaN(port) && port > 0 && port < 65536) {
         settings.port = port;
       }
       settings.pin = this.pinDraft.trim();
       await settings.save();
-      promptAction.showToast({ message: $r('app.string.saved'), duration: 2000 });
+      AppContext.refreshIdentity();
+      AppStorage.setOrCreate('lanshare_alias', settings.alias);
+      promptAction.showToast({
+        message: settings.port !== previousPort ? $r('app.string.port_restart_hint') : $r('app.string.saved'),
+        duration: 2500
+      });
     } catch (e) {
       this.toast('not ready yet');
     }

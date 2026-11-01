@@ -45,10 +45,17 @@
     { "name": "settings_alias", "value": "设备名称" },
     { "name": "settings_port", "value": "端口" },
     { "name": "settings_pin", "value": "PIN 码（留空关闭）" },
-    { "name": "settings_security_note", "value": "预览版当前使用 HTTP 明文传输，加密传输（HTTPS/TLS）将在 M2 提供。" },
+    { "name": "settings_security_note", "value": "预览版接收使用 HTTP 明文；可以向开启加密（HTTPS）的设备发送，但暂不校验对方证书（证书指纹校验将在 M2 提供）。" },
     { "name": "save", "value": "保存" },
     { "name": "saved", "value": "已保存" },
     { "name": "fingerprint_label", "value": "指纹" },
-    { "name": "protocol_label", "value": "协议" }
+    { "name": "protocol_label", "value": "协议" },
+    { "name": "send_declined", "value": "对方拒绝了接收。" },
+    { "name": "send_busy", "value": "对方正在进行其他传输，请稍后再试。" },
+    { "name": "pin_locked", "value": "PIN 码错误次数过多，对方已暂时拒绝你的请求。" },
+    { "name": "port_restart_hint", "value": "已保存。新端口需重启应用后生效。" },
+    { "name": "protocol_value", "value": "协议：%s" },
+    { "name": "fingerprint_value", "value": "指纹：%s" },
+    { "name": "file_skipped", "value": "已跳过（超过 64 MB）" }
   ]
 }

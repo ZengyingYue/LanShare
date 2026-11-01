@@ -41,6 +41,14 @@ export class AppContext {
     return AppContext.appIdentity;
   }
 
+  /** Rebuild the announced identity after settings changed. */
+  static refreshIdentity(): void {
+    const next = AppContext.buildIdentity(AppContext.getSettings());
+    // The server keeps listening on the old port until the app restarts.
+    next.port = AppContext.getIdentity().port;
+    AppContext.appIdentity = next;
+  }
+
   static isFingerprintSelf(fingerprint: string): boolean {
     const own = AppContext.getIdentity().fingerprint;
     return own.toUpperCase() === fingerprint.toUpperCase();

@@ -45,10 +45,17 @@
     { "name": "settings_alias", "value": "Device name" },
     { "name": "settings_port", "value": "Port" },
     { "name": "settings_pin", "value": "PIN (empty = off)" },
-    { "name": "settings_security_note", "value": "This preview build transfers over plain HTTP. Encrypted HTTPS (TLS) arrives in M2." },
+    { "name": "settings_security_note", "value": "Receiving uses plain HTTP in this preview build. Sending to HTTPS peers works, but their certificate is not verified yet (fingerprint pinning arrives in M2)." },
     { "name": "save", "value": "Save" },
     { "name": "saved", "value": "Saved" },
     { "name": "fingerprint_label", "value": "Fingerprint" },
-    { "name": "protocol_label", "value": "Protocol" }
+    { "name": "protocol_label", "value": "Protocol" },
+    { "name": "send_declined", "value": "The receiver declined the transfer." },
+    { "name": "send_busy", "value": "The receiver is busy with another transfer. Try again later." },
+    { "name": "pin_locked", "value": "Too many wrong PIN attempts. The receiver is temporarily blocking you." },
+    { "name": "port_restart_hint", "value": "Saved. Restart the app for the new port to take effect." },
+    { "name": "protocol_value", "value": "Protocol: %s" },
+    { "name": "fingerprint_value", "value": "Fingerprint: %s" },
+    { "name": "file_skipped", "value": "Skipped (over 64 MB)" }
   ]
 }

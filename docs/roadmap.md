@@ -10,7 +10,11 @@
 
 ## M1 — 真机可用（当前阶段）
 
-- [ ] DevEco Studio（Windows/macOS）构建通过，修复编译问题
+- [x] 静态审查修正（未编译）：补 `oh-package.json5`、`GET_NETWORK_INFO` 权限、
+      ArkTS 严格模式写法、保存到文档 URI、设置页 PIN 被清空、超大请求体 OOM 等
+- [x] 发送侧改用 rcp：可直连默认开启加密（HTTPS）的官方客户端
+- [x] PC 端测试对端 `tools/lspeer.py`（发现/收/发/场景脚本）
+- [ ] 构建通过（DevEco Studio 或 Linux Command Line Tools），修复编译问题
 - [ ] 真机 ↔ 桌面版 LocalSend 双向互传验证
 - [ ] 多播在真机上的行为验证（失败时确认 HTTP 兜底有效）
 - [ ] 真实 Wi-Fi 环境下 PIN、拒绝、取消、并发场景测试

@@ -24,7 +24,9 @@
 - [x] 四页 UI（附近 / 发送 / 接收 / 设置）
 - [ ] DevEco Studio 构建验证（需 Windows/macOS）
 - [ ] 真机 ↔ 桌面版 LocalSend 互传测试
-- [ ] M1 限制：明文 HTTP 传输；单文件 ≤ 64 MB（整读整发）
+- [x] M1 代码修正：补齐 oh-package、GET_NETWORK_INFO 权限、ArkTS 严格模式问题；
+      发送侧改用 rcp，可直连开启加密（HTTPS）的官方客户端
+- [ ] M1 限制：接收侧明文 HTTP；发送 HTTPS 暂不校验证书；单文件 ≤ 64 MB
 
 见 [docs/roadmap.md](docs/roadmap.md) 了解完整里程碑（M2 将加入 TLS 加密与证书指纹）。
 
@@ -38,7 +40,7 @@ app/ohos/entry/src/main/ets/
 │                   Dto                协议数据模型 + 兼容性处理
 ├── server/         HttpServer         基于 TCPSocketServer 的手写 HTTP/1.1
 │                   LanShareServer     LocalSend v2 REST 路由
-├── client/         LocalSendClient    发送侧 HTTP 客户端（M2 切换 rcp/TLS）
+├── client/         LocalSendClient    发送侧 rcp 客户端（HTTP/HTTPS，M2 加指纹校验）
 ├── receive/        ReceiveController  接收会话状态机 + 保存
 ├── send/           SendController     发送流程
 ├── common/         Settings/DeviceStore/Logger/...
@@ -56,9 +58,13 @@ DevEco Studio 仅提供 Windows / macOS 版本：
 3. `File → Project Structure → Signing Configs` 配置自动签名
 4. 连接 HarmonyOS NEXT 真机（或模拟器），点击 Run
 
-> 本仓库在 Linux 上开发（代码 + 协议文档），编译需在 Windows/macOS 的 DevEco Studio 中完成。
+> 本仓库在 Linux 上开发。除 DevEco Studio 外，也可用华为
+> [Command Line Tools](https://developer.huawei.com/consumer/cn/download/)（含 Linux 版）
+> 在命令行构建，步骤见 [docs/testing.md](docs/testing.md)。
 
 ## 🧪 互传测试 / Interop Testing
+
+> 完整的 M1 测试清单与脚本化测试工具 `tools/lspeer.py` 见 [docs/testing.md](docs/testing.md)。
 
 1. 电脑安装 [LocalSend 桌面版](https://localsend.org)，与手机连入**同一 Wi-Fi**（关闭 AP 隔离）
 2. **手机 → 电脑**：LanShare「发送」页选文件 → 「附近」页点击电脑设备

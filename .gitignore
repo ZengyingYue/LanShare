@@ -1,7 +1,7 @@
 # Node / hvigor
 node_modules/
 oh_modules/
-/.hvigor/
+.hvigor/
 .cxx/
 .cache/
 

@@ -13,7 +13,7 @@
 │   ├─ HttpServer          TCP 80/53317   │             │
 │   │    └─ LanShareServer 路由            │             │
 │   │         └─ ReceiveController 接收状态机│             │
-│   └─ LocalSendClient     发送侧 HTTP      │             │
+│   └─ LocalSendClient     发送侧 rcp       │             │
 │        └─ SendController                │             │
 ├─────────────────────────────────────────────────────┤
 │ common: Settings(persist) / AppContext / Dto / Mime  │
@@ -61,14 +61,20 @@ ArkTS 应用逻辑跑在同一事件循环上，服务端回调可直接触发 U
 
 权限模型下应用不能随意写公共目录，因此接收先写入应用沙箱
 `cacheDir`，全部收齐后由系统 `DocumentViewPicker.save()` 让用户
-选择目标位置，`fs.copyFile` 拷出。保存对话框要求应用前台，
+选择目标位置，以写模式打开返回的文档 URI 后 `fs.copyFileSync` 到其 fd。保存对话框要求应用前台，
 后台收完时 UI 保留「保存到本机」按钮供用户手动触发。
 
-### 6. 发送侧内存约束（M1 限制）
+### 6. 发送客户端与内存约束（M1 限制）
 
-`@ohos.net.http` 的请求体为一次性 ArrayBuffer，因此 M1 限制单文件
-64 MB（`ProtocolConstants.MAX_FILE_SIZE_BYTES`），超限文件在选择阶段
-即标记拒绝。M2 计划改用 rcp 或分块方案解除限制。
+`LocalSendClient` 基于 RemoteCommunicationKit（rcp），单个长生命周期
+Session，`remoteValidation: 'skip'` + `proxy: 'no-proxy'`：同一代码路径
+即可连接 HTTP 与 HTTPS（官方客户端默认）对端，且局域网流量不经系统代理/VPN。
+HTTP 兜底扫描对每个地址同时尝试 https 与 http。
+
+请求体与接收缓冲均为整块 ArrayBuffer，因此 M1 限制单文件 64 MB
+（`ProtocolConstants.MAX_FILE_SIZE_BYTES`）：发送侧在选择阶段标记，
+接收侧不为超限文件分配 token，HttpServer 对超限请求体直接回 413。
+M3 计划改为流式落盘/分块上传解除限制。
 
 ## 线程与生命周期
 
