@@ -14,10 +14,10 @@
     { "name": "refresh", "value": "刷新" },
     { "name": "send_to_this_device", "value": "发送" },
 
-    { "name": "send_title", "value": "发送文件" },
+    { "name": "send_title", "value": "发送" },
     { "name": "pick_files", "value": "选择文件" },
     { "name": "pick_photos", "value": "选择照片" },
-    { "name": "send_files_empty", "value": "尚未选择文件。请先选择文件，再到“附近”页点击目标设备。" },
+    { "name": "send_files_empty", "value": "尚未添加内容。请先选择文件或粘贴文本，再到“附近”页点击目标设备。" },
     { "name": "sending", "value": "发送中..." },
     { "name": "send_done", "value": "发送成功" },
     { "name": "send_failed", "value": "发送失败" },
@@ -61,6 +61,13 @@
     { "name": "message_copied", "value": "已复制到剪贴板" },
     { "name": "message_copy_failed", "value": "未能自动复制，请点“复制”。" },
     { "name": "copy", "value": "复制" },
-    { "name": "close", "value": "关闭" }
+    { "name": "close", "value": "关闭" },
+    { "name": "enter_text", "value": "输入文本" },
+    { "name": "text_placeholder", "value": "要发送的文本" },
+    { "name": "add_text", "value": "添加" },
+    { "name": "cancel", "value": "取消" },
+    { "name": "text_item", "value": "文本" },
+    { "name": "clipboard_empty", "value": "剪贴板里没有文本。" },
+    { "name": "clipboard_added", "value": "已添加剪贴板文本" }
   ]
 }

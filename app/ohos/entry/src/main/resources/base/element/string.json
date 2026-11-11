@@ -14,10 +14,10 @@
     { "name": "refresh", "value": "Refresh" },
     { "name": "send_to_this_device", "value": "Send" },
 
-    { "name": "send_title", "value": "Send files" },
+    { "name": "send_title", "value": "Send" },
     { "name": "pick_files", "value": "Pick files" },
     { "name": "pick_photos", "value": "Pick photos" },
-    { "name": "send_files_empty", "value": "No files selected yet. Pick files, then tap a device in the Nearby tab." },
+    { "name": "send_files_empty", "value": "Nothing added yet. Pick files or paste text, then tap a device in the Nearby tab." },
     { "name": "sending", "value": "Sending..." },
     { "name": "send_done", "value": "Sent successfully" },
     { "name": "send_failed", "value": "Send failed" },
@@ -61,6 +61,13 @@
     { "name": "message_copied", "value": "Copied to clipboard" },
     { "name": "message_copy_failed", "value": "Could not copy automatically. Tap Copy." },
     { "name": "copy", "value": "Copy" },
-    { "name": "close", "value": "Close" }
+    { "name": "close", "value": "Close" },
+    { "name": "enter_text", "value": "Type text" },
+    { "name": "text_placeholder", "value": "Text to send" },
+    { "name": "add_text", "value": "Add" },
+    { "name": "cancel", "value": "Cancel" },
+    { "name": "text_item", "value": "Text" },
+    { "name": "clipboard_empty", "value": "The clipboard has no text." },
+    { "name": "clipboard_added", "value": "Clipboard text added" }
   ]
 }

@@ -60,6 +60,7 @@
 | `client/LocalSendClient.ets` | `rcp.createSession({ requestConfiguration: { security: { remoteValidation: 'skip' }, proxy: 'no-proxy' } })`、`new rcp.Request(url, 'POST', headers, content)`、`request.configuration.transfer.timeout.{connectMs,transferMs}`、`response.toString()` |
 | `protocol/MulticastProvider.ets` | `socket.constructMulticastSocketInstance()`、`setLoopbackMode`、`addMembership` |
 | `receive/ReceiveController.ets` | `new picker.DocumentViewPicker(context)`、`fs.copyFileSync(path, fd)`、`pasteboard.createData(MIMETYPE_TEXT_PLAIN, text)` + `getSystemPasteboard().setData()` |
+| `pages/Index.ets` | `PasteButton({ icon, text, buttonType }).onClick((event, result: PasteButtonOnClickResult) => …)`、`getSystemPasteboard().getData()` + `getPrimaryText()`、`TabsController.changeIndex()` |
 | `server/HttpServer.ets` | `socket.constructTCPSocketServerInstance()` 的 `connect`/`message` 事件 |
 
 ## 2. 测试对端：`tools/lspeer.py`
@@ -68,7 +69,7 @@ PC 上的最小 LocalSend v2 实现（仅 Python 标准库，HTTP），用于在
 
 ```bash
 python3 tools/lspeer.py discover                     # 多播宣告，列出应答的设备（含手机）
-python3 tools/lspeer.py serve --out ~/inbox          # 当接收端；可加 --pin 1234 / --mode decline|busy
+python3 tools/lspeer.py serve --out ~/inbox          # 当接收端；可加 --pin 1234 / --mode decline|busy；收到文本消息会打印并回 204
 python3 tools/lspeer.py send <手机IP> a.jpg b.pdf     # 当发送端
 python3 tools/lspeer.py send <手机IP> --text "你好"   # 发文本消息（同官方“粘贴”），应回 204
 python3 tools/lspeer.py scenarios <手机IP> [--pin 1234]   # 按提示在手机上点接受/拒绝，自动判定结果

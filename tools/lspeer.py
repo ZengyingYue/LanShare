@@ -267,6 +267,11 @@ def make_handler(rx, alias, port):
                     return self.reply(409)
                 if rx.mode == 'decline':
                     return self.reply(403)
+                only = list(files.values())[0] if len(files) == 1 else None
+                if only and only.get('preview') and str(only.get('fileType', '')).startswith('text'):
+                    # Text message, like the official receiver: show it, no upload.
+                    log(f'text message: {only["preview"]!r}')
+                    return self.reply(204)
                 sid = uuid.uuid4().hex
                 rx.session = {'id': sid, 'ip': ip,
                               'files': {fid: (f, uuid.uuid4().hex) for fid, f in files.items()},

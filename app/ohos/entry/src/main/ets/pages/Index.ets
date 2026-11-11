@@ -1,6 +1,7 @@
 import { promptAction } from '@kit.ArkUI';
 import { picker } from '@kit.CoreFileKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
 import { Device } from '../protocol/Dto';
 import { LanShareApp } from '../app/LanShareApp';
 import { SendController, OutgoingFile, OutgoingFileStates, SendResult } from '../send/SendController';
@@ -28,6 +29,8 @@ struct Index {
   @State aliasDraft: string = '';
   @State portDraft: string = '';
   @State pinDraft: string = '';
+  @State textDraft: string = '';
+  @State showTextEditor: boolean = false;
 
   private sendController: SendController = SendController.getInstance();
   private tabsController: TabsController = new TabsController();
@@ -233,6 +236,66 @@ struct Index {
       .width('100%')
       .padding({ left: 16, right: 16 })
 
+      Row({ space: 8 }) {
+        Column() {
+          // Security component: tapping it grants one-shot clipboard read
+          // access, so no READ_PASTEBOARD permission is needed.
+          PasteButton({ icon: PasteIconStyle.LINES, text: PasteDescription.PASTE,
+            buttonType: ButtonType.Capsule })
+            .fontSize(14)
+            .backgroundColor($r('app.color.app_primary'))
+            .width('100%')
+            .onClick((event: ClickEvent, result: PasteButtonOnClickResult) => {
+              if (result === PasteButtonOnClickResult.SUCCESS) {
+                this.addClipboardText();
+              }
+            })
+        }
+        .layoutWeight(1)
+        Button($r('app.string.enter_text'))
+          .fontSize(14)
+          .backgroundColor($r('app.color.app_primary'))
+          .layoutWeight(1)
+          .onClick(() => {
+            this.showTextEditor = !this.showTextEditor;
+          })
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 8 })
+
+      if (this.showTextEditor) {
+        Column({ space: 8 }) {
+          TextArea({ placeholder: $r('app.string.text_placeholder'), text: this.textDraft })
+            .fontSize(14)
+            .height(120)
+            .onChange((value: string) => {
+              this.textDraft = value;
+            })
+          Row({ space: 8 }) {
+            Button($r('app.string.cancel'))
+              .fontSize(14)
+              .backgroundColor($r('app.color.text_secondary'))
+              .layoutWeight(1)
+              .onClick(() => {
+                this.showTextEditor = false;
+              })
+            Button($r('app.string.add_text'))
+              .fontSize(14)
+              .backgroundColor($r('app.color.success'))
+              .layoutWeight(1)
+              .enabled(this.textDraft.length > 0)
+              .onClick(() => {
+                this.sendController.addText(this.textDraft);
+                this.textDraft = '';
+                this.showTextEditor = false;
+              })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 8 })
+      }
+
       if (this.sendFiles.length === 0) {
         Column() {
           Text($r('app.string.send_files_empty'))
@@ -250,17 +313,26 @@ struct Index {
             ListItem() {
               Row() {
                 Column() {
-                  Text(file.fileName)
+                  Text(file.text !== null ? file.text : file.fileName)
                     .fontSize(15)
                     .fontColor($r('app.color.text_primary'))
-                    .maxLines(1)
+                    .maxLines(file.text !== null ? 2 : 1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(`${this.formatSize(file.size)} · ${this.fileStateLabel(file.state)}`)
-                    .fontSize(12)
-                    .fontColor(file.state === OutgoingFileStates.FAILED
-                      || file.state === OutgoingFileStates.TOO_LARGE
-                      ? $r('app.color.danger') : $r('app.color.text_secondary'))
-                    .margin({ top: 2 })
+                  Row({ space: 6 }) {
+                    if (file.text !== null) {
+                      Text($r('app.string.text_item'))
+                        .fontSize(11)
+                        .fontColor($r('app.color.app_primary'))
+                        .border({ width: 1, color: $r('app.color.app_primary'), radius: 4 })
+                        .padding({ left: 4, right: 4 })
+                    }
+                    Text(`${this.formatSize(file.size)} · ${this.fileStateLabel(file.state)}`)
+                      .fontSize(12)
+                      .fontColor(file.state === OutgoingFileStates.FAILED
+                        || file.state === OutgoingFileStates.TOO_LARGE
+                        ? $r('app.color.danger') : $r('app.color.text_secondary'))
+                  }
+                  .margin({ top: 2 })
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
@@ -311,6 +383,24 @@ struct Index {
     } catch (e) {
       this.toast('pick failed');
     }
+  }
+
+  /** Called after the PasteButton granted clipboard access. */
+  private async addClipboardText(): Promise<void> {
+    let text = '';
+    try {
+      const data = await pasteboard.getSystemPasteboard().getData();
+      text = data.getPrimaryText() ?? '';
+    } catch (e) {
+      const err = e as BusinessError;
+      console.warn(`[LanShare][UI] clipboard read failed: ${err.message ?? 'unknown'}`);
+    }
+    if (text.length === 0) {
+      promptAction.showToast({ message: $r('app.string.clipboard_empty'), duration: 2500 });
+      return;
+    }
+    this.sendController.addText(text);
+    promptAction.showToast({ message: $r('app.string.clipboard_added'), duration: 2000 });
   }
 
   private async pickPhotos(): Promise<void> {

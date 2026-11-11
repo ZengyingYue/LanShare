@@ -7,6 +7,7 @@ import { AppContext } from '../common/AppContext';
 import { Mime } from '../common/Mime';
 import { ProtocolConstants } from '../common/Constants';
 import { Logger } from '../common/Logger';
+import { ByteUtils } from '../common/ByteUtils';
 
 export class OutgoingFileStates {
   static readonly READY: string = 'ready';
@@ -22,16 +23,19 @@ export class OutgoingFile {
   readonly fileName: string;
   readonly size: number;
   readonly fileType: string;
+  /** Non-null for a text item (pasted/typed); it has no uri. */
+  readonly text: string | null;
   state: string;
 
   constructor(id: string, uri: string, fileName: string, size: number, fileType: string,
-    state: string) {
+    state: string, text: string | null = null) {
     this.id = id;
     this.uri = uri;
     this.fileName = fileName;
     this.size = size;
     this.fileType = fileType;
     this.state = state;
+    this.text = text;
   }
 }
 
@@ -103,6 +107,23 @@ export class SendController {
     this.notify();
   }
 
+  /**
+   * Add a text item (clipboard or typed). Sent alone it becomes a LocalSend
+   * text message (content in `preview`, receiver shows it, no upload);
+   * mixed with files it is uploaded as a .txt, like the official clients.
+   */
+  addText(text: string): void {
+    if (text.length === 0) {
+      return;
+    }
+    const id = util.generateRandomUUID(false);
+    const size = ByteUtils.utf8Encode(text).byteLength;
+    const state = size > ProtocolConstants.MAX_FILE_SIZE_BYTES
+      ? OutgoingFileStates.TOO_LARGE : OutgoingFileStates.READY;
+    this.files.push(new OutgoingFile(id, '', `${id}.txt`, size, 'text/plain', state, text));
+    this.notify();
+  }
+
   clear(): void {
     this.files = [];
     this.notify();
@@ -129,8 +150,10 @@ export class SendController {
     }
 
     const identity = AppContext.getIdentity();
+    // A lone text item travels entirely in `preview` (official "message").
+    const asMessage = ready.length === 1 && ready[0].text !== null;
     const dtos: FileDto[] = ready.map((f: OutgoingFile) => {
-      return new FileDto(f.id, f.fileName, f.size, f.fileType, null, null);
+      return new FileDto(f.id, f.fileName, f.size, f.fileType, null, asMessage ? f.text : null);
     });
 
     let response: PrepareUploadResponseJson;
@@ -200,7 +223,9 @@ export class SendController {
     file.state = OutgoingFileStates.UPLOADING;
     this.notify();
     try {
-      const data = await SendController.readAll(file.uri, file.size);
+      const text = file.text;
+      const data = text !== null
+        ? SendController.textBytes(text) : await SendController.readAll(file.uri, file.size);
       const ok = await this.client.uploadFile(device, sessionId, fileId, token, data);
       file.state = ok ? OutgoingFileStates.DONE : OutgoingFileStates.FAILED;
       this.notify();
@@ -218,6 +243,11 @@ export class SendController {
     if (this.onChange !== null) {
       this.onChange();
     }
+  }
+
+  private static textBytes(text: string): ArrayBuffer {
+    const bytes = ByteUtils.utf8Encode(text);
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   }
 
   /** Read the whole file (bounded by MAX_FILE_SIZE_BYTES by the caller). */
