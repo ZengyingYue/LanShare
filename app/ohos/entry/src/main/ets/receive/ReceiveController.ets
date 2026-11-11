@@ -1,6 +1,6 @@
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
-import { BusinessError } from '@kit.BasicServicesKit';
+import { BusinessError, pasteboard } from '@kit.BasicServicesKit';
 import { FileDto, IdentityJson } from '../protocol/Dto';
 import { AppContext } from '../common/AppContext';
 import { AppStorageKeys, ProtocolConstants } from '../common/Constants';
@@ -132,6 +132,52 @@ export class ReceiveController {
     this.publish(ReceivePhases.WAITING, alias, sender.deviceModel ?? '', senderIp, sessionId,
       this.snapshotFiles(), '');
     return new PromptOutcome(true, sessionId, tokens);
+  }
+
+  /**
+   * A LocalSend text message: one text file whose full content travels in
+   * `preview` (Windows/macOS "Paste"/"Text" send). Like the official client
+   * we show it without a prompt and the server answers 204, so the sender
+   * never uploads a .txt file. The text also goes to the system clipboard.
+   */
+  receiveMessage(sender: IdentityJson, senderIp: string, text: string): void {
+    let alias = senderIp;
+    if (typeof sender.alias === 'string' && sender.alias.length > 0) {
+      alias = sender.alias;
+    }
+    const model = sender.deviceModel ?? '';
+    this.logger.info(`text message from ${senderIp} (${text.length} chars)`);
+    this.publish(ReceivePhases.MESSAGE, alias, model, senderIp, '', [], '', text, false);
+    this.copyMessage();
+  }
+
+  /** Copy the displayed message to the system clipboard (also the Copy button). */
+  async copyMessage(): Promise<void> {
+    const snap = this.snapshot;
+    if (snap.phase !== ReceivePhases.MESSAGE) {
+      return;
+    }
+    let error = '';
+    try {
+      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, snap.message);
+      await pasteboard.getSystemPasteboard().setData(data);
+    } catch (e) {
+      const err = e as BusinessError;
+      error = err.message ?? 'copy failed';
+      this.logger.warn(`clipboard write failed: ${error}`);
+    }
+    // A newer request may have replaced the snapshot while we awaited.
+    if (this.snapshot === snap) {
+      this.publish(ReceivePhases.MESSAGE, snap.senderAlias, snap.senderModel, snap.senderIp, '', [],
+        error, snap.message, error === '');
+    }
+  }
+
+  /** Close button on the message card. */
+  dismissMessage(): void {
+    if (this.snapshot.phase === ReceivePhases.MESSAGE) {
+      this.publish(ReceivePhases.IDLE, '', '', '', '', [], '');
+    }
   }
 
   /** Called by the Accept button. */
@@ -305,15 +351,16 @@ export class ReceiveController {
   }
 
   private publish(phase: string, alias: string, model: string, ip: string, sessionId: string,
-    files: IncomingFile[], error: string): void {
-    this.snapshot = new ReceiveSnapshot(phase, alias, model, ip, sessionId, files, error);
+    files: IncomingFile[], error: string, message: string = '', copied: boolean = false): void {
+    this.snapshot = new ReceiveSnapshot(phase, alias, model, ip, sessionId, files, error, message, copied);
     AppStorage.setOrCreate(AppStorageKeys.RECEIVE_STATE, this.snapshot);
   }
 
   private resetAfter(ms: number): void {
     setTimeout(() => {
       if (this.session === null && this.pendingResolve === null
-        && this.snapshot.phase !== ReceivePhases.PROMPTING) {
+        && this.snapshot.phase !== ReceivePhases.PROMPTING
+        && this.snapshot.phase !== ReceivePhases.MESSAGE) {
         this.publish(ReceivePhases.IDLE, '', '', '', '', [], '');
       }
     }, ms);

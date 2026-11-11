@@ -56,6 +56,11 @@
     { "name": "port_restart_hint", "value": "已保存。新端口需重启应用后生效。" },
     { "name": "protocol_value", "value": "协议：%s" },
     { "name": "fingerprint_value", "value": "指纹：%s" },
-    { "name": "file_skipped", "value": "已跳过（超过 64 MB）" }
+    { "name": "file_skipped", "value": "已跳过（超过 64 MB）" },
+    { "name": "message_received", "value": "收到文本" },
+    { "name": "message_copied", "value": "已复制到剪贴板" },
+    { "name": "message_copy_failed", "value": "未能自动复制，请点“复制”。" },
+    { "name": "copy", "value": "复制" },
+    { "name": "close", "value": "关闭" }
   ]
 }

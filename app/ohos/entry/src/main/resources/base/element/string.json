@@ -56,6 +56,11 @@
     { "name": "port_restart_hint", "value": "Saved. Restart the app for the new port to take effect." },
     { "name": "protocol_value", "value": "Protocol: %s" },
     { "name": "fingerprint_value", "value": "Fingerprint: %s" },
-    { "name": "file_skipped", "value": "Skipped (over 64 MB)" }
+    { "name": "file_skipped", "value": "Skipped (over 64 MB)" },
+    { "name": "message_received", "value": "Text received" },
+    { "name": "message_copied", "value": "Copied to clipboard" },
+    { "name": "message_copy_failed", "value": "Could not copy automatically. Tap Copy." },
+    { "name": "copy", "value": "Copy" },
+    { "name": "close", "value": "Close" }
   ]
 }

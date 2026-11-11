@@ -9,6 +9,8 @@ export class ReceivePhases {
   static readonly SAVING: string = 'saving';
   static readonly SAVED: string = 'saved';
   static readonly FAILED: string = 'failed';
+  /** A text message (LocalSend "send text"/clipboard): shown, no file transfer. */
+  static readonly MESSAGE: string = 'message';
 }
 
 /** One file of an incoming session. */
@@ -42,9 +44,14 @@ export class ReceiveSnapshot {
   readonly sessionId: string;
   readonly files: IncomingFile[];
   readonly error: string;
+  /** Text of a MESSAGE-phase snapshot. */
+  readonly message: string;
+  /** MESSAGE phase: whether the text was copied to the system clipboard. */
+  readonly copied: boolean;
 
   constructor(phase: string, senderAlias: string, senderModel: string, senderIp: string,
-    sessionId: string, files: IncomingFile[], error: string) {
+    sessionId: string, files: IncomingFile[], error: string, message: string = '',
+    copied: boolean = false) {
     this.phase = phase;
     this.senderAlias = senderAlias;
     this.senderModel = senderModel;
@@ -52,6 +59,8 @@ export class ReceiveSnapshot {
     this.sessionId = sessionId;
     this.files = files;
     this.error = error;
+    this.message = message;
+    this.copied = copied;
   }
 
   static idle(): ReceiveSnapshot {

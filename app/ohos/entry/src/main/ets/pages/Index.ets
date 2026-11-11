@@ -8,11 +8,14 @@ import { ReceiveController } from '../receive/ReceiveController';
 import { ReceiveSnapshot, ReceivePhases, IncomingFile } from '../receive/ReceiveModels';
 import { AppContext } from '../common/AppContext';
 
+const RECEIVE_TAB_INDEX: number = 2;
+
 @Entry
 @Component
 struct Index {
   @StorageLink('lanshare_devices') devices: Device[] = [];
-  @StorageLink('lanshare_receive_state') receiveState: ReceiveSnapshot = ReceiveSnapshot.idle();
+  @StorageLink('lanshare_receive_state') @Watch('onReceiveState') receiveState: ReceiveSnapshot =
+    ReceiveSnapshot.idle();
   @StorageProp('lanshare_server_port') @Watch('onPortPublished') serverPort: number = 0;
   @StorageProp('lanshare_alias') @Watch('onAliasPublished') storedAlias: string = '';
   @StorageProp('lanshare_fingerprint') fingerprint: string = '';
@@ -27,6 +30,8 @@ struct Index {
   @State pinDraft: string = '';
 
   private sendController: SendController = SendController.getInstance();
+  private tabsController: TabsController = new TabsController();
+  private lastReceivePhase: string = ReceivePhases.IDLE;
 
   aboutToAppear(): void {
     this.sendController.setChangeListener(() => {
@@ -42,6 +47,21 @@ struct Index {
       this.aliasDraft = alias;
       this.loadSettingDrafts();
     }
+  }
+
+  /** Bring the Receive tab forward when a request or text message arrives. */
+  onReceiveState(): void {
+    const state = this.receiveState;
+    const phase = state.phase;
+    // A fresh message snapshot is published before the clipboard write
+    // finishes (copied=false, error=''); that also catches message #2
+    // arriving while message #1 is still on screen.
+    const freshMessage = phase === ReceivePhases.MESSAGE && !state.copied && state.error === '';
+    const newPrompt = phase === ReceivePhases.PROMPTING && this.lastReceivePhase !== phase;
+    if (freshMessage || newPrompt) {
+      this.tabsController.changeIndex(RECEIVE_TAB_INDEX);
+    }
+    this.lastReceivePhase = phase;
   }
 
   onPortPublished(): void {
@@ -70,7 +90,7 @@ struct Index {
   }
 
   build() {
-    Tabs({ barPosition: BarPosition.End }) {
+    Tabs({ barPosition: BarPosition.End, controller: this.tabsController }) {
       TabContent() {
         this.nearbyTab()
       }
@@ -381,6 +401,8 @@ struct Index {
       Column() {
         if (this.receiveState.phase === ReceivePhases.PROMPTING) {
           this.promptCard()
+        } else if (this.receiveState.phase === ReceivePhases.MESSAGE) {
+          this.messageCard()
         } else if (this.receiveState.phase === ReceivePhases.WAITING
           || this.receiveState.phase === ReceivePhases.RECEIVING
           || this.receiveState.phase === ReceivePhases.SAVING
@@ -454,6 +476,73 @@ struct Index {
           .layoutWeight(1)
           .onClick(() => {
             ReceiveController.getInstance().acceptFromUi();
+          })
+      }
+      .width('100%')
+      .margin({ top: 12 })
+    }
+    .padding(16)
+    .backgroundColor($r('app.color.card_bg'))
+    .borderRadius(12)
+    .margin(12)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  messageCard() {
+    Column() {
+      Text($r('app.string.message_received'))
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.text_primary'))
+        .width('100%')
+      Text($r('app.string.incoming_from',
+        this.receiveState.senderAlias === '' ? this.receiveState.senderIp : this.receiveState.senderAlias))
+        .fontSize(13)
+        .fontColor($r('app.color.text_secondary'))
+        .margin({ top: 4 })
+        .width('100%')
+
+      Scroll() {
+        Text(this.receiveState.message)
+          .fontSize(15)
+          .fontColor($r('app.color.text_primary'))
+          .copyOption(CopyOptions.LocalDevice)
+          .width('100%')
+      }
+      .width('100%')
+      .constraintSize({ maxHeight: 360 })
+      .align(Alignment.TopStart)
+      .margin({ top: 12 })
+
+      if (this.receiveState.copied) {
+        Text($r('app.string.message_copied'))
+          .fontSize(12)
+          .fontColor($r('app.color.success'))
+          .margin({ top: 8 })
+          .width('100%')
+      } else if (this.receiveState.error !== '') {
+        Text($r('app.string.message_copy_failed'))
+          .fontSize(12)
+          .fontColor($r('app.color.danger'))
+          .margin({ top: 8 })
+          .width('100%')
+      }
+
+      Row({ space: 12 }) {
+        Button($r('app.string.close'))
+          .fontSize(14)
+          .backgroundColor($r('app.color.text_secondary'))
+          .layoutWeight(1)
+          .onClick(() => {
+            ReceiveController.getInstance().dismissMessage();
+          })
+        Button($r('app.string.copy'))
+          .fontSize(14)
+          .backgroundColor($r('app.color.app_primary'))
+          .layoutWeight(1)
+          .onClick(() => {
+            ReceiveController.getInstance().copyMessage();
           })
       }
       .width('100%')

@@ -124,6 +124,14 @@ export class LanShareServer {
       return HttpResponse.text(409, 'Blocked by another session');
     }
 
+    // Text message (official clients' "Paste"/"Text"): the whole text is in
+    // `preview` of a single text file. No session, no upload: 204.
+    const message = LanShareServer.messageText(files);
+    if (message !== null) {
+      this.receive.receiveMessage(body.info, req.remoteAddress, message);
+      return HttpResponse.empty(204);
+    }
+
     const outcome = await this.receive.promptAndStart(body.info, req.remoteAddress, files);
     if (!outcome.accepted) {
       return HttpResponse.text(403, 'Declined');
@@ -164,6 +172,19 @@ export class LanShareServer {
     }
     const cancelled = this.receive.cancelFromPeer(sessionId, req.remoteAddress);
     return cancelled ? HttpResponse.empty(200) : HttpResponse.text(409, 'No such session');
+  }
+
+  /** Same rule as the official receiver: exactly one text-typed file with a preview. */
+  private static messageText(files: FileDto[]): string | null {
+    if (files.length !== 1 || files[0].preview === null) {
+      return null;
+    }
+    const type = files[0].fileType.toLowerCase();
+    // v2 sends a MIME type ("text/plain"); v1 sent the enum name ("text").
+    if (type === 'text' || type.startsWith('text/')) {
+      return files[0].preview;
+    }
+    return null;
   }
 
   private parseJson(body: ArrayBuffer): Object | null {

@@ -7,12 +7,14 @@ Stdlib only. Speaks plain HTTP (like LanShare M1). Subcommands:
   discover               announce over multicast and list peers that answer
   serve                  act as a receiver (multicast + REST), save files to --out
   send IP FILE...        send files to a peer (register -> prepare-upload -> upload)
+  send IP --text TEXT    send a text message (preview-only, expects 204 like clipboard send)
   scenarios IP           scripted M1 checks against a LanShare receiver
 
 Examples:
   python3 tools/lspeer.py discover
   python3 tools/lspeer.py serve --out /tmp/inbox --pin 1234
   python3 tools/lspeer.py send 192.168.0.23 photo.jpg notes.txt
+  python3 tools/lspeer.py send 192.168.0.23 --text "hello from the PC"
   python3 tools/lspeer.py scenarios 192.168.0.23
 """
 import argparse
@@ -368,6 +370,18 @@ def cmd_send(args):
     else:
         return 1
     log(f'register ({scheme}) -> {status} {info}')
+    if args.text is not None:
+        # What official clients send for "Paste"/"Text": one text/plain file
+        # whose full content is in preview. A compliant receiver answers 204.
+        data = args.text.encode()
+        msg = {'id': uuid.uuid4().hex, 'fileName': f'{uuid.uuid4().hex}.txt', 'size': len(data),
+               'fileType': 'text/plain', 'preview': args.text}
+        status, resp = prepare(args.ip, args.port, args.alias, [msg], args.pin, scheme=scheme)
+        log(f'prepare-upload (text) -> {status} {resp}')
+        return 0 if status == 204 else 1
+    if not args.files:
+        log('nothing to send: give FILE... or --text')
+        return 2
     files = [file_entry(p) for p in args.files]
     by_id = {f['id']: p for f, p in zip(files, args.files)}
     log('prepare-upload (accept on the phone)…')
@@ -496,7 +510,8 @@ def main():
 
     t = sub.add_parser('send')
     t.add_argument('ip')
-    t.add_argument('files', nargs='+')
+    t.add_argument('files', nargs='*')
+    t.add_argument('--text', help='send this text as a LocalSend message instead of files')
     t.add_argument('--port', type=int, default=PORT)
     t.add_argument('--pin')
     t.add_argument('--cancel-after', type=int, help='cancel after uploading N files')
